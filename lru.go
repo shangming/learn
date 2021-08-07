@@ -52,7 +52,7 @@ func (lru *Lru) Set(key interface{}, val interface{}) {
 	if len(lru.items) >= lru.size {
 		node := lru.node.pre
 		lru.remove(node)
-		delete(lru.items, key)
+		delete(lru.items, node.key)
 	}
 
 	lru.items[key] = &listNode{key: key, val: val}
@@ -78,6 +78,31 @@ func (lru *Lru) Len() int {
 	return len(lru.items)
 }
 
-func (lru *Lru) Test() int {
-	return 100
+func (lru *Lru) GetAll() map[interface{}]interface{} {
+	lru.mu.RLock()
+	defer lru.mu.RUnlock()
+
+	all := make(map[interface{}]interface{}, len(lru.items))
+
+	for k, v := range lru.items {
+		all[k] = v.val
+	}
+
+	return all
+}
+
+func (lru *Lru) GetLinkKey() []interface{} {
+	lru.mu.RLock()
+	defer lru.mu.RUnlock()
+
+	l := make([]interface{}, 0, len(lru.items))
+
+	cur := lru.node.next
+
+	for cur != &lru.node {
+		l = append(l, cur.key)
+		cur = cur.next
+	}
+
+	return l
 }
