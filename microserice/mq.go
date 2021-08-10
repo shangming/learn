@@ -22,8 +22,14 @@ type Mq struct {
 	msgQueues sync.Map
 }
 
+func newMsgQueue() *msgQueue {
+	q := &msgQueue{}
+	q.consumers = make(map[int]int, 0)
+	return q
+}
+
 func (mq *Mq) getMsgQueue(topic string) *msgQueue {
-	x, _ := mq.msgQueues.LoadOrStore(topic, &msgQueue{})
+	x, _ := mq.msgQueues.LoadOrStore(topic, newMsgQueue())
 	q, _ := x.(*msgQueue)
 	return q
 }
@@ -36,7 +42,7 @@ func (mq *Mq) Send(topic string, msg interface{}) <-chan Ack {
 		q := mq.getMsgQueue(topic)
 		q.mu.Lock()
 		q.data = append(q.data, msg)
-		ack := Ack{Id: len(q.data), Topic: topic}
+		ack := Ack{Id: len(q.data) - 1, Topic: topic}
 		q.mu.Unlock()
 
 		c <- ack
@@ -45,9 +51,9 @@ func (mq *Mq) Send(topic string, msg interface{}) <-chan Ack {
 	return c
 }
 
-func (mq *Mq) Poll(consumerId int, topic string, num int) []interface{} {
+func (mq *Mq) Poll(consumerId int, topic string, num int) []Record {
 
-	msgs := []interface{}{}
+	msgs := []Record{}
 
 	q := mq.getMsgQueue(topic)
 	q.mu.Lock()
@@ -79,7 +85,7 @@ func (mq *Mq) Confirm(consumerId int, topic string, offset int) <-chan bool {
 		q := mq.getMsgQueue(topic)
 		q.mu.Lock()
 		defer q.mu.Unlock()
-		q.consumers[consumerId] = offset
+		q.consumers[consumerId] = offset + 1
 		c <- true
 	}()
 
